@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import QRCode from 'qrcode.react';
 
@@ -81,38 +81,29 @@ const ARButton = styled.button`
 
 function ARPopup({ onClose, config }) {
   const [isMobile, setIsMobile] = useState(false);
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const modelViewerRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      return /android|iphone|ipad|ipod/i.test(userAgent);
+      return /android|iphone|ipad|ipod/i.test(userAgent.toLowerCase());
     };
     setIsMobile(checkMobile());
   }, []);
 
-  const requestCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop());
-      setHasCameraPermission(true);
-      return true;
-    } catch (error) {
-      console.error('Помилка доступу до камери:', error);
-      alert('Будь ласка, надайте дозвіл на використання камери для AR функціоналу');
-      return false;
-    }
-  };
-
-  const handleARClick = async () => {
-    if (!isMobile) return;
+  const handleARButtonClick = async () => {
+    if (!modelViewerRef.current) return;
     
-    const hasPermission = await requestCameraPermission();
-    if (!hasPermission) return;
-
-    const modelViewer = document.querySelector('model-viewer');
-    if (modelViewer) {
-      modelViewer.activateAR();
+    try {
+      // Перевіряємо чи підтримується AR
+      if (modelViewerRef.current.canActivateAR) {
+        await modelViewerRef.current.activateAR();
+      } else {
+        alert('AR не підтримується на вашому пристрої');
+      }
+    } catch (error) {
+      console.error('Помилка при активації AR:', error);
+      alert('Виникла помилка при спробі запустити AR');
     }
   };
 
@@ -123,21 +114,22 @@ function ARPopup({ onClose, config }) {
     <PopupOverlay onClick={onClose}>
       <PopupContent onClick={e => e.stopPropagation()}>
         <CloseButton onClick={onClose}>×</CloseButton>
-        <h2>View in AR</h2>
+        <h2>Перегляд в AR</h2>
         <ConfigInfo>
-          Current configuration:
+          Поточна конфігурація:
           <br />
-          Material: {config.material}
+          Матеріал: {config.material}
           <br />
-          Color: {config.color}
+          Колір: {config.color}
           <br />
-          Hardware: {config.hardware}
+          Фурнітура: {config.hardware}
         </ConfigInfo>
         
         {isMobile ? (
           <>
             <ModelViewerContainer>
               <model-viewer
+                ref={modelViewerRef}
                 src="/models/backpack.glb"
                 ar
                 ar-modes="webxr scene-viewer quick-look"
@@ -148,16 +140,17 @@ function ARPopup({ onClose, config }) {
                 auto-rotate
                 style={{ width: '100%', height: '100%' }}
               >
-                <ARButton slot="ar-button" onClick={handleARClick}>
-                  View in your space
+                <ARButton 
+                  slot="ar-button"
+                  onClick={handleARButtonClick}
+                >
+                  Переглянути в AR
                 </ARButton>
               </model-viewer>
             </ModelViewerContainer>
-            {!hasCameraPermission && (
-              <Instructions>
-                Натисніть "View in your space" щоб отримати доступ до камери
-              </Instructions>
-            )}
+            <Instructions>
+              Натисніть "Переглянути в AR" щоб побачити рюкзак у доповненій реальності
+            </Instructions>
           </>
         ) : (
           <>
